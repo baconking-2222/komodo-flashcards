@@ -9,6 +9,8 @@ import streamlit as st
 
 from activities import ACTIVITIES, ALL_PURPOSES, filter_activities, get_activity
 from branding import (
+    AGE_DISPLAY_TO_CODE,
+    AGE_FILTER_OPTIONS,
     page_subtitle,
     page_title,
     render_browse_card,
@@ -46,12 +48,13 @@ page_subtitle(
 with st.sidebar:
     st.markdown("### 🔎 Filters")
 
-    age_filter = st.multiselect(
+    age_display = st.multiselect(
         "Age group",
-        options=["Jr", "Sr", "All"],
+        options=AGE_FILTER_OPTIONS,
         default=[],
-        help="Jr = primary (5–12), Sr = secondary (13–18). Cards tagged 'All' always appear.",
+        help="Primary = 5–12. Secondary = 13–18. Cards tagged 'All ages' always appear.",
     )
+    age_filter = [AGE_DISPLAY_TO_CODE[a] for a in age_display]
 
     purpose_filter = st.multiselect(
         "Purpose",

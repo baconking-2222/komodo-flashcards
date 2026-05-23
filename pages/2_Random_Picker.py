@@ -7,7 +7,14 @@ import random
 import streamlit as st
 
 from activities import filter_activities, get_activity
-from branding import page_subtitle, page_title, render_present_card, set_brand
+from branding import (
+    AGE_DISPLAY_TO_CODE,
+    AGE_FILTER_OPTIONS,
+    page_subtitle,
+    page_title,
+    render_present_card,
+    set_brand,
+)
 
 set_brand("Random picker")
 page_title("🎲 Random picker")
@@ -18,11 +25,12 @@ page_subtitle(
 
 with st.sidebar:
     st.markdown("### 🔎 Narrow the pool")
-    age_filter = st.multiselect(
+    age_display = st.multiselect(
         "Age group",
-        options=["Jr", "Sr", "All"],
+        options=AGE_FILTER_OPTIONS,
         default=[],
     )
+    age_filter = [AGE_DISPLAY_TO_CODE[a] for a in age_display]
 
 pool = filter_activities(
     ages=age_filter if age_filter else None,

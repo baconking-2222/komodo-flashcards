@@ -28,9 +28,23 @@ COLOURS = {
 }
 
 
+# Display labels for age tabs.
+AGE_LABELS = {
+    "Jr": "Primary",
+    "Sr": "Secondary",
+    "All": "All ages",
+}
+# Filter options shown to users → internal codes.
+AGE_FILTER_OPTIONS = ["All ages", "Primary", "Secondary"]
+AGE_DISPLAY_TO_CODE = {
+    "All ages": "All",
+    "Primary": "Jr",
+    "Secondary": "Sr",
+}
+
+
 def set_brand(page_title: str) -> None:
-    """Call once at the top of every page. Sets config, logo, CSS, and the
-    branded sidebar nav. Hides Streamlit's default multipage nav."""
+    """Call once at the top of every page."""
     st.set_page_config(
         page_title=f"{page_title} • Komodo Wellbeing",
         page_icon=str(ICON_PATH) if ICON_PATH.exists() else "🌿",
@@ -38,7 +52,6 @@ def set_brand(page_title: str) -> None:
         initial_sidebar_state="expanded",
     )
 
-    # Streamlit's brand logo helper — handles sidebar + collapsed-navbar placement.
     if LOGO_PATH.exists():
         try:
             st.logo(
@@ -48,39 +61,27 @@ def set_brand(page_title: str) -> None:
                 link=None,
             )
         except TypeError:
-            # Older Streamlit signature
             st.logo(str(LOGO_PATH))
 
-    # Use st.html for raw CSS — st.markdown double-renders <style> content as text.
     try:
         st.html(_GLOBAL_CSS)
     except AttributeError:
-        # Fallback for older Streamlit
         st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
     _render_sidebar_nav()
 
 
 def _render_sidebar_nav() -> None:
-    """Custom branded nav at the top of the sidebar (replaces default page list)."""
+    """Custom branded nav at the top of the sidebar."""
     with st.sidebar:
-        st.markdown(
-            "<div class='kb-nav-label'>Navigate</div>",
-            unsafe_allow_html=True,
-        )
-        # st.page_link accepts the path to the page file.
+        st.markdown("<div class='kb-nav-label'>Navigate</div>", unsafe_allow_html=True)
         st.page_link("Browse_all.py", label="Browse all activities", icon="🔍")
         st.page_link("pages/1_Themed_Sets.py", label="Themed sets", icon="🎨")
         st.page_link("pages/2_Random_Picker.py", label="Random picker", icon="🎲")
-        st.page_link("pages/3_Training_Guide.py", label="Training guide", icon="📘")
         st.markdown("<div class='kb-nav-divider'></div>", unsafe_allow_html=True)
 
 
 def page_title(text: str) -> None:
-    """Big page title (no inline logo — st.logo handles that)."""
-    st.markdown(
-        f"<h1 style='margin: 6px 0 4px;'>{html.escape(text)}</h1>",
-        unsafe_allow_html=True,
-    )
+    st.markdown(f"<h1 style='margin: 6px 0 4px;'>{html.escape(text)}</h1>", unsafe_allow_html=True)
 
 
 def page_subtitle(text: str) -> None:
@@ -91,55 +92,77 @@ def page_subtitle(text: str) -> None:
     )
 
 
-def pills_html(activity: Activity, *, include_purposes: bool = True) -> str:
-    """Pills shown on every card. NO body-only / props pill (per design)."""
+def _age_pill(activity: Activity) -> str:
+    label = AGE_LABELS.get(activity.age, activity.age)
+    return f"<span class='pill age-{activity.age}'>{label}</span>"
+
+
+def pills_html(activity: Activity, *, primary_only: bool = True) -> str:
+    """Pills row. By default: age + duration + ONE primary purpose."""
     parts = [
-        f"<span class='pill age-{activity.age}'>{activity.age}</span>",
+        _age_pill(activity),
         f"<span class='pill duration'>⏱ {activity.duration_minutes} min</span>",
     ]
-    if include_purposes:
+    if primary_only:
+        if activity.purposes:
+            parts.append(f"<span class='pill purpose'>{html.escape(activity.purposes[0])}</span>")
+    else:
         for p in activity.purposes:
             parts.append(f"<span class='pill purpose'>{html.escape(p)}</span>")
     return " ".join(parts)
 
 
+def _short_objective(text: str, *, max_chars: int = 140) -> str:
+    """Trim objective to ~one sentence, with a soft char cap."""
+    # First sentence
+    first = text.split(". ")[0].rstrip(".") + "."
+    if len(first) <= max_chars:
+        return first
+    # Fall back to char-cap
+    return first[: max_chars - 1].rstrip(", ;") + "…"
+
+
 def _card_body_html(activity: Activity) -> str:
-    """The content of a browse card — emoji, title, pills, objective, instructions
-    preview. Designed to be placed inside an `st.container(border=True)`."""
+    """Compact browse card body — emoji, title, ONE wellbeing tag, short objective.
+    No instructions preview (users open the card to see them)."""
     return (
         "<div class='kb-card-body'>"
         "<div class='kb-card-head'>"
         f"<div class='kb-card-emoji'>{activity.emoji}</div>"
         "<div class='kb-card-headtext'>"
         f"<h3>{html.escape(activity.name)}</h3>"
-        f"<div class='pills-row'>{pills_html(activity)}</div>"
+        f"<div class='pills-row'>{pills_html(activity, primary_only=True)}</div>"
         "</div>"
         "</div>"
-        f"<div class='kb-card-objective'><strong>Objective:</strong> {html.escape(activity.objective)}</div>"
-        f"<div class='kb-card-instructions'><strong>📋 Instructions:</strong> {html.escape(activity.instructions)}</div>"
+        f"<div class='kb-card-objective'>{html.escape(_short_objective(activity.objective))}</div>"
         "</div>"
     )
 
 
 def render_browse_card(activity: Activity, *, on_open_key: str) -> bool:
-    """Render a card with an Open button INSIDE (top-right). Returns True if clicked."""
+    """Compact card with title/objective on the left and a small Open pill top-right.
+    Returns True if the Open button was clicked.
+
+    Uses keyed Streamlit elements so CSS can reliably target them across
+    Streamlit versions (the default stVerticalBlock DOM has no distinguishing
+    testid for bordered containers).
+    """
     clicked = False
-    with st.container(border=True):
-        cols = st.columns([4, 1.4], vertical_alignment="top")
+    with st.container(key=f"kbcard_{activity.id}"):
+        cols = st.columns([7, 1.2], vertical_alignment="top")
         with cols[0]:
             st.markdown(_card_body_html(activity), unsafe_allow_html=True)
         with cols[1]:
-            st.markdown("<div class='kb-open-spacer'></div>", unsafe_allow_html=True)
-            if st.button("Open ▶", key=on_open_key, use_container_width=True):
+            if st.button("Open", key=f"kbopen_{activity.id}"):
                 clicked = True
     return clicked
 
 
 def render_themed_card(themed, *, on_open_key: str) -> bool:
-    """Themed-set card with Open button top-right (Komodo green)."""
+    """Themed-set card — same compact treatment."""
     clicked = False
-    with st.container(border=True):
-        cols = st.columns([4, 1.4], vertical_alignment="top")
+    with st.container(key=f"kbcard_set_{themed.id}"):
+        cols = st.columns([7, 1.2], vertical_alignment="top")
         with cols[0]:
             st.markdown(
                 "<div class='kb-card-body'>"
@@ -152,20 +175,19 @@ def render_themed_card(themed, *, on_open_key: str) -> bool:
                 "</div>"
                 "</div>"
                 "</div>"
-                f"<div class='kb-card-objective'>{html.escape(themed.description)}</div>"
-                f"<div class='kb-card-when'><strong>When to use:</strong> {html.escape(themed.when_to_use)}</div>"
+                f"<div class='kb-card-objective'>{html.escape(_short_objective(themed.description, max_chars=160))}</div>"
+                f"<div class='kb-card-when'>📅 {html.escape(themed.when_to_use)}</div>"
                 "</div>",
                 unsafe_allow_html=True,
             )
         with cols[1]:
-            st.markdown("<div class='kb-open-spacer'></div>", unsafe_allow_html=True)
-            if st.button("Open ▶", key=on_open_key, use_container_width=True):
+            if st.button("Open", key=f"kbopen_set_{themed.id}"):
                 clicked = True
     return clicked
 
 
 def render_present_card(activity: Activity, header_eyebrow: str = "") -> None:
-    """Big presentation card + the interactive widget below."""
+    """Big presentation card + interactive widget below."""
     eyebrow_html = ""
     if header_eyebrow:
         eyebrow_html = f"<div class='eyebrow'>{html.escape(header_eyebrow)}</div>"
@@ -185,7 +207,8 @@ def render_present_card(activity: Activity, header_eyebrow: str = "") -> None:
         f"<div class='present-emoji'>{activity.emoji}</div>"
         "<div class='present-text'>"
         f"<h1>{html.escape(activity.name)}</h1>"
-        f"<div class='pills-row'>{pills_html(activity)}</div>"
+        # Show full pill set on the presentation page (still useful context).
+        f"<div class='pills-row'>{pills_html(activity, primary_only=False)}</div>"
         "</div>"
         "</div>"
         f"<div class='objective'><strong>Objective:</strong> {html.escape(activity.objective)}</div>"
@@ -221,8 +244,8 @@ _GLOBAL_CSS = """
   }
   .stApp {
     background:
-      radial-gradient(circle at 10% 15%, rgba(165,218,255,0.4) 0%, transparent 28%),
-      radial-gradient(circle at 90% 85%, rgba(119,238,214,0.3) 0%, transparent 28%),
+      radial-gradient(circle at 10% 15%, rgba(165,218,255,0.35) 0%, transparent 28%),
+      radial-gradient(circle at 90% 85%, rgba(119,238,214,0.22) 0%, transparent 28%),
       var(--pale-blue);
   }
   h1, h2, h3, h4, h5 {
@@ -231,15 +254,14 @@ _GLOBAL_CSS = """
     font-weight: 700;
   }
 
-  /* ---- HIDE Streamlit's default multipage nav (we render our own) ---- */
+  /* Hide Streamlit's default multipage nav */
   [data-testid="stSidebarNav"] { display: none !important; }
 
-  /* ---- Sidebar styling ---- */
+  /* Sidebar */
   section[data-testid="stSidebar"] {
     background: var(--white);
     border-right: 2px solid var(--black-blue);
   }
-  /* Make st.logo render the wordmark larger and crisp */
   img[data-testid="stSidebarLogo"],
   img[data-testid="stLogo"],
   [data-testid="stSidebarHeader"] img,
@@ -251,7 +273,6 @@ _GLOBAL_CSS = """
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
   }
-  /* Sidebar header should give the logo room to breathe */
   [data-testid="stSidebarHeader"] {
     padding: 16px 14px 8px !important;
   }
@@ -263,7 +284,6 @@ _GLOBAL_CSS = """
     text-transform: uppercase;
     margin: 8px 4px 8px;
   }
-  /* Branded sidebar nav links (st.page_link) */
   section[data-testid="stSidebar"] [data-testid="stPageLink"] a,
   section[data-testid="stSidebar"] a[data-testid="stPageLink-NavLink"] {
     display: flex;
@@ -291,7 +311,7 @@ _GLOBAL_CSS = """
     margin: 14px 0 10px;
   }
 
-  /* ---- Primary buttons (global) ---- */
+  /* Primary buttons */
   .stButton > button {
     background: var(--vibrant-blue);
     color: var(--white) !important;
@@ -308,74 +328,73 @@ _GLOBAL_CSS = """
     border-color: var(--black-blue);
   }
 
-  /* ---- Cards: st.container(border=True) styled as Komodo brand cards ---- */
-  [data-testid="stVerticalBlockBorderWrapper"] {
-    background: var(--white);
+  /* ----- BROWSE / THEMED CARDS -----
+     Each card wraps in a Streamlit container with a stable key ("kbcard_*"),
+     which becomes a CSS class "st-key-kbcard_*" on the stElementContainer.
+     We style that wrapper to look like a Komodo brand card. */
+  [class*="st-key-kbcard_"] {
+    background: #ffffff !important;
     border: 2px solid var(--black-blue) !important;
-    border-radius: 14px !important;
-    padding: 14px 18px !important;
-    box-shadow: 0 2px 8px rgba(0,31,52,0.08);
+    border-radius: 16px !important;
+    padding: 16px 18px !important;
+    box-shadow: 0 4px 14px rgba(0,31,52,0.10) !important;
+    min-height: 168px;
     height: 100%;
     margin-bottom: 14px;
   }
-  /* Make columns stretch their bordered children to equal height for uniform cards */
-  [data-testid="stHorizontalBlock"] {
-    align-items: stretch;
-  }
+  /* Stretch sibling cards in a row to match heights */
+  [data-testid="stHorizontalBlock"] { align-items: stretch; }
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
   }
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > [data-testid="stVerticalBlock"] {
     flex: 1;
   }
-  /* Open buttons inside bordered cards = Komodo green pill, compact */
-  [data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
-    background: var(--light-green);
-    color: var(--black-blue) !important;
-    border: 2.5px solid var(--black-blue);
-    border-radius: 30px;
-    padding: 6px 8px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    white-space: nowrap;
-    min-width: 0;
+  /* Compact Open pill inside cards, aligned to top-right of its column */
+  [class*="st-key-kbopen_"] {
+    text-align: right;
   }
-  [data-testid="stVerticalBlockBorderWrapper"] .stButton > button:hover {
-    background: var(--pastel-green);
+  [class*="st-key-kbopen_"] button {
+    background: var(--light-green) !important;
+    color: var(--black-blue) !important;
+    border: 2px solid var(--black-blue) !important;
+    border-radius: 999px !important;
+    padding: 3px 14px !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    line-height: 1.4 !important;
+    box-shadow: none !important;
+    width: auto !important;
+  }
+  [class*="st-key-kbopen_"] button:hover {
+    background: var(--pastel-green) !important;
   }
   /* Card body */
   .kb-card-body { padding: 0; }
-  .kb-card-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
-  .kb-card-emoji { font-size: 2.4rem; line-height: 1; flex-shrink: 0; padding-top: 2px; }
+  .kb-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+  .kb-card-emoji { font-size: 2.2rem; line-height: 1; flex-shrink: 0; padding-top: 2px; }
   .kb-card-headtext { flex: 1; min-width: 0; }
-  .kb-card-headtext h3 { margin: 0 0 6px; font-size: 1.2rem; }
+  .kb-card-headtext h3 { margin: 0 0 6px; font-size: 1.15rem; line-height: 1.2; }
   .kb-card-objective {
     color: #2a4458;
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     line-height: 1.45;
-    margin: 8px 0 10px;
-  }
-  .kb-card-instructions {
-    background: var(--pale-blue);
-    border-left: 4px solid var(--komodo-blue);
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 0.93rem;
-    line-height: 1.5;
+    margin: 8px 0 4px;
   }
   .kb-card-when {
-    margin-top: 8px;
+    margin-top: 6px;
     color: #2a4458;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-style: italic;
   }
-  .kb-open-spacer { height: 4px; }
 
-  /* ---- Pills ---- */
+  /* ----- PILLS ----- */
   .pill {
     display: inline-block;
-    padding: 3px 11px;
+    padding: 3px 10px;
     border-radius: 999px;
     font-weight: 700;
     font-size: 0.74rem;
@@ -391,7 +410,7 @@ _GLOBAL_CSS = """
   .pill.purpose  { background: var(--white); }
   .pill.duration { background: var(--pastel-blue); }
 
-  /* ---- Presentation card ---- */
+  /* ----- PRESENTATION CARD ----- */
   .present-card {
     background: var(--white);
     border: 3px solid var(--black-blue);
@@ -472,7 +491,7 @@ _GLOBAL_CSS = """
     white-space: pre-line;
   }
 
-  /* ---- Random picker hero ---- */
+  /* ----- RANDOM PICKER HERO ----- */
   .draw-hero {
     text-align: center;
     padding: 30px 20px;
@@ -489,7 +508,6 @@ _GLOBAL_CSS = """
   }
   .draw-hero h2 { margin: 4px 0 16px; color: var(--komodo-navy); }
 
-  /* Hide Streamlit footer */
   footer { visibility: hidden; }
 </style>
 """
