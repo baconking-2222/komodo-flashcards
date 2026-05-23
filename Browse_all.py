@@ -15,6 +15,7 @@ from branding import (
     page_title,
     render_browse_card,
     render_present_card,
+    scroll_to_top,
     set_brand,
 )
 
@@ -29,14 +30,21 @@ if selected_id:
         st.session_state.pop("selected_activity", None)
         st.rerun()
 
+    scroll_to_top()
+
     back_col, _ = st.columns([1, 5])
     with back_col:
         if st.button("← Back to deck"):
             st.session_state.pop("selected_activity", None)
+            st.session_state["_kb_scroll_top"] = True
             st.rerun()
 
     render_present_card(activity)
     st.stop()
+
+# Scroll to top when returning to the deck after opening a card.
+if st.session_state.pop("_kb_scroll_top", False):
+    scroll_to_top()
 
 
 # ---------- Browse mode (grid) ----------

@@ -115,6 +115,7 @@ ACTIVITIES: list[Activity] = [
             "seconds": 30,
             "prompt": "Stomp your feet 👣 — Shake your arms 🙌 — Shake your legs 🦵",
             "finish_prompt": "Now take ONE BIG, DEEP BREATH 🌬️",
+            "animation": "stomp_shake",
         },
     ),
     Activity(
@@ -347,16 +348,14 @@ ACTIVITIES: list[Activity] = [
         ),
         instructions=(
             "Draw how you're feeling. Imagine the feeling as a creature, a kind of weather, a "
-            "shape, a colour, or an object."
+            "shape, a colour, or an object. Use the pad below — choose a colour and brush size."
         ),
-        steps=(
-            {"icon": "🧠", "label": "Name the feeling", "body": "What's the strongest feeling in you right now?"},
-            {"icon": "🌤️", "label": "If it was weather, what would it be?", "body": "Sunny, foggy, stormy, gentle drizzle?"},
-            {"icon": "🐝", "label": "If it was a creature, what would it look like?", "body": "Big or small? Friendly or fierce? What colour?"},
-            {"icon": "✏️", "label": "Draw it", "body": "Use paper, a screen, or just trace it in the air. There's no right or wrong."},
-            {"icon": "👀", "label": "Look at what you made", "body": "Now your feeling lives on the page — not inside you. How does that feel?"},
-        ),
-        interactive_type="stepped",
+        steps=(),
+        interactive_type="canvas",
+        widget_config={
+            "width": 640,
+            "height": 380,
+        },
     ),
     Activity(
         id="inner_weather_report",
@@ -445,6 +444,7 @@ ACTIVITIES: list[Activity] = [
             "seconds": 90,
             "prompt": "Scrunch 🤏 — Rip ✂️ — Twist 🔄 — Squeeze 🤜",
             "finish_prompt": "Now take ONE BIG, DEEP BREATH 🌬️",
+            "animation": "squeeze",
         },
     ),
     Activity(
@@ -545,10 +545,9 @@ ACTIVITIES: list[Activity] = [
             "twisting, spinning, tapping, or pushing your hands against a wall."
         ),
         steps=(),
-        interactive_type="timer_simple",
+        interactive_type="motion_picker",
         widget_config={
             "seconds": 30,
-            "prompt": "Pick one and go: Rock 🪨 · Crawl 🐛 · Stomp 👣 · Twist 🌀 · Spin 💫 · Tap 👏 · Push the wall 🧱",
             "finish_prompt": "Big breath in… and out. Notice how your body feels now.",
         },
     ),

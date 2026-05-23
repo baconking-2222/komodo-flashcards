@@ -13,6 +13,7 @@ from branding import (
     render_browse_card,
     render_present_card,
     render_themed_card,
+    scroll_to_top,
     set_brand,
 )
 from themed_sets import THEMED_SETS, get_themed_set
@@ -35,10 +36,13 @@ if selected_set_id and selected_activity_id:
     ids = list(themed.activity_ids)
     pos = ids.index(activity.id)
 
+    scroll_to_top()
+
     nav_cols = st.columns([1, 1, 4])
     with nav_cols[0]:
         if st.button("← Back to set"):
             st.session_state.pop("set_active_card", None)
+            st.session_state["_kb_scroll_top"] = True
             st.rerun()
     with nav_cols[1]:
         st.markdown(f"**Card {pos + 1} of {len(ids)}**")
@@ -50,14 +54,20 @@ if selected_set_id and selected_activity_id:
         if pos > 0:
             if st.button("◀ Previous card"):
                 st.session_state["set_active_card"] = ids[pos - 1]
+                st.session_state["_kb_scroll_top"] = True
                 st.rerun()
     with nav2[1]:
         if pos < len(ids) - 1:
             if st.button("Next card ▶"):
                 st.session_state["set_active_card"] = ids[pos + 1]
+                st.session_state["_kb_scroll_top"] = True
                 st.rerun()
 
     st.stop()
+
+# Scroll to top when nav state changes from another card opening.
+if st.session_state.pop("_kb_scroll_top", False):
+    scroll_to_top()
 
 
 # ---------- Drill-down 1: inside a chosen set ----------

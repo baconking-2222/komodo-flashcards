@@ -80,6 +80,37 @@ def _render_sidebar_nav() -> None:
         st.markdown("<div class='kb-nav-divider'></div>", unsafe_allow_html=True)
 
 
+def scroll_to_top() -> None:
+    """Inject JS to scroll the Streamlit main area to the top. Call once at the
+    top of a page (e.g. when entering presentation mode) to avoid landing the
+    user halfway down the page after a rerun."""
+    import streamlit.components.v1 as components
+
+    components.html(
+        """
+        <script>
+            (function() {
+                let tries = 0;
+                const tick = setInterval(function() {
+                    try {
+                        const doc = window.parent.document;
+                        const targets = [
+                            doc.querySelector('[data-testid="stMain"]'),
+                            doc.querySelector('section.main'),
+                            doc.scrollingElement,
+                        ].filter(Boolean);
+                        targets.forEach(t => t.scrollTo({top: 0, behavior: 'instant'}));
+                        clearInterval(tick);
+                    } catch (e) { /* sandbox: ignore */ }
+                    if (++tries > 8) clearInterval(tick);
+                }, 60);
+            })();
+        </script>
+        """,
+        height=0,
+    )
+
+
 def page_title(text: str) -> None:
     st.markdown(f"<h1 style='margin: 6px 0 4px;'>{html.escape(text)}</h1>", unsafe_allow_html=True)
 
@@ -112,14 +143,17 @@ def pills_html(activity: Activity, *, primary_only: bool = True) -> str:
     return " ".join(parts)
 
 
-def _short_objective(text: str, *, max_chars: int = 140) -> str:
-    """Trim objective to ~one sentence, with a soft char cap."""
-    # First sentence
-    first = text.split(". ")[0].rstrip(".") + "."
-    if len(first) <= max_chars:
-        return first
-    # Fall back to char-cap
-    return first[: max_chars - 1].rstrip(", ;") + "…"
+def _short_objective(text: str, *, max_sentences: int = 2, max_chars: int = 260) -> str:
+    """Trim objective to a fixed number of sentences for uniform card sizing."""
+    if not text:
+        return ""
+    # Split on ". " to preserve sentences; ignore empty fragments.
+    parts = [p.strip() for p in text.split(". ") if p.strip()]
+    chosen = parts[:max_sentences]
+    result = ". ".join(p.rstrip(".") for p in chosen) + "."
+    if len(result) > max_chars:
+        result = result[: max_chars - 1].rstrip(", ;") + "…"
+    return result
 
 
 def _card_body_html(activity: Activity) -> str:
@@ -336,11 +370,17 @@ _GLOBAL_CSS = """
     background: #ffffff !important;
     border: 2px solid var(--black-blue) !important;
     border-radius: 16px !important;
-    padding: 16px 18px !important;
+    padding: 22px 24px !important;
     box-shadow: 0 4px 14px rgba(0,31,52,0.10) !important;
-    min-height: 168px;
+    min-height: 240px;
     height: 100%;
     margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Make the inner block fill the card so content is evenly distributed */
+  [class*="st-key-kbcard_"] > [data-testid="stVerticalBlock"] {
+    flex: 1;
   }
   /* Stretch sibling cards in a row to match heights */
   [data-testid="stHorizontalBlock"] { align-items: stretch; }
