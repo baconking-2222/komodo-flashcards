@@ -16,6 +16,7 @@ from branding import (
     scroll_to_top,
     set_brand,
 )
+from words import all_words_for_filter
 
 set_brand("Random picker")
 page_title("🎲 Random picker")
@@ -26,7 +27,7 @@ page_subtitle(
 
 
 # Filters live on the page itself (not sidebar) so they're discoverable.
-filter_cols = st.columns([3, 4])
+filter_cols = st.columns([1, 1])
 with filter_cols[0]:
     age_display = st.multiselect(
         "Age group",
@@ -34,11 +35,19 @@ with filter_cols[0]:
         default=[],
         help="Narrow the pool by age. Cards tagged 'All ages' always appear.",
     )
+with filter_cols[1]:
+    word_filter = st.multiselect(
+        "Word of the week",
+        options=all_words_for_filter(),
+        default=[],
+        help="Tied to the Komodo curriculum vocabulary used across the product.",
+    )
 
 age_filter = [AGE_DISPLAY_TO_CODE[a] for a in age_display]
 
 pool = filter_activities(
     ages=age_filter if age_filter else None,
+    words=word_filter if word_filter else None,
     props_filter="Any",
 )
 

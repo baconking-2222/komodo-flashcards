@@ -691,6 +691,7 @@ def filter_activities(
     *,
     ages: list[str] | None = None,
     purposes: list[str] | None = None,
+    words: list[str] | None = None,
     props_filter: str = "Any",  # "Any" | "Body-only" | "Needs supplies"
     search: str = "",
 ) -> list[Activity]:
@@ -701,12 +702,17 @@ def filter_activities(
         out = [a for a in out if a.age in ages or a.age == "All"]
     if purposes:
         out = [a for a in out if any(p in a.purposes for p in purposes)]
+    if words:
+        # Words filter: activity matches if it's tagged with any selected word.
+        from words import get_activity_word_set  # local import to avoid cycle
+        out = [a for a in out if get_activity_word_set(a.id) & set(words)]
     if props_filter == "Body-only":
         out = [a for a in out if not a.props_needed]
     elif props_filter == "Needs supplies":
         out = [a for a in out if a.props_needed]
     if search:
         s = search.lower().strip()
+        from words import get_activity_word_set
         out = [
             a
             for a in out
@@ -714,5 +720,6 @@ def filter_activities(
             or s in a.objective.lower()
             or s in a.instructions.lower()
             or any(s in p.lower() for p in a.purposes)
+            or any(s in w.lower() for w in get_activity_word_set(a.id))
         ]
     return out

@@ -18,6 +18,7 @@ from branding import (
     scroll_to_top,
     set_brand,
 )
+from words import all_words_for_filter
 
 set_brand("Browse activities")
 
@@ -65,10 +66,17 @@ with st.sidebar:
     age_filter = [AGE_DISPLAY_TO_CODE[a] for a in age_display]
 
     purpose_filter = st.multiselect(
-        "Purpose",
+        "Wellbeing area",
         options=ALL_PURPOSES,
         default=[],
         help="What the activity is designed to do.",
+    )
+
+    word_filter = st.multiselect(
+        "Word of the week",
+        options=all_words_for_filter(),
+        default=[],
+        help="Tied to the Komodo curriculum vocabulary used across the product.",
     )
 
     search = st.text_input("Search", placeholder="e.g. 'breathing', 'gratitude'")
@@ -77,6 +85,7 @@ with st.sidebar:
 filtered = filter_activities(
     ages=age_filter if age_filter else None,
     purposes=purpose_filter if purpose_filter else None,
+    words=word_filter if word_filter else None,
     props_filter="Any",
     search=search,
 )

@@ -9,6 +9,7 @@ import streamlit as st
 
 from activities import Activity
 import widgets
+import words as kb_words
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 LOGO_PATH = ASSETS_DIR / "logo-primary.png"
@@ -129,7 +130,7 @@ def _age_pill(activity: Activity) -> str:
 
 
 def pills_html(activity: Activity, *, primary_only: bool = True) -> str:
-    """Pills row. By default: age + duration + ONE primary purpose."""
+    """Pills row. By default: age + duration + ONE primary wellbeing area."""
     parts = [
         _age_pill(activity),
         f"<span class='pill duration'>⏱ {activity.duration_minutes} min</span>",
@@ -141,6 +142,26 @@ def pills_html(activity: Activity, *, primary_only: bool = True) -> str:
         for p in activity.purposes:
             parts.append(f"<span class='pill purpose'>{html.escape(p)}</span>")
     return " ".join(parts)
+
+
+def word_pills_html(activity: Activity) -> str:
+    """Curriculum 'Word of the week' pills, with hover tooltips for the
+    definition. Only shown on the presentation card."""
+    pills = kb_words.get_activity_word_pills(activity.id, age=activity.age)
+    if not pills:
+        return ""
+    parts = ["<div class='word-pills-row'>",
+             "<span class='word-pills-label'>📚 Word of the week:</span>"]
+    for p in pills:
+        # title attribute = native browser tooltip with the definition
+        css_cls = "word-pill primary" if p["category"] == "Primary" else "word-pill secondary"
+        parts.append(
+            f"<span class='{css_cls}' title='{html.escape(p['description'])}'>"
+            f"{html.escape(p['name'])}"
+            "</span>"
+        )
+    parts.append("</div>")
+    return "".join(parts)
 
 
 def _short_objective(text: str, *, max_sentences: int = 2, max_chars: int = 260) -> str:
@@ -234,6 +255,8 @@ def render_present_card(activity: Activity, header_eyebrow: str = "") -> None:
             "</div>"
         )
 
+    word_pills = word_pills_html(activity)
+
     st.markdown(
         "<div class='present-card'>"
         f"{eyebrow_html}"
@@ -241,10 +264,10 @@ def render_present_card(activity: Activity, header_eyebrow: str = "") -> None:
         f"<div class='present-emoji'>{activity.emoji}</div>"
         "<div class='present-text'>"
         f"<h1>{html.escape(activity.name)}</h1>"
-        # Show full pill set on the presentation page (still useful context).
         f"<div class='pills-row'>{pills_html(activity, primary_only=False)}</div>"
         "</div>"
         "</div>"
+        f"{word_pills}"
         f"<div class='objective'><strong>Objective:</strong> {html.escape(activity.objective)}</div>"
         f"{props_block}"
         "<div class='instructions-block'>"
@@ -530,6 +553,41 @@ _GLOBAL_CSS = """
     line-height: 1.55;
     white-space: pre-line;
   }
+
+  /* ----- WORD-OF-THE-WEEK PILLS (presentation card) ----- */
+  .word-pills-row {
+    margin: 6px 0 14px;
+    padding: 12px 14px;
+    background: var(--pastel-green);
+    border: 2px solid var(--black-blue);
+    border-radius: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .word-pills-label {
+    font-weight: 700;
+    color: var(--komodo-navy);
+    font-size: 0.9rem;
+    margin-right: 4px;
+  }
+  .word-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 2px solid var(--black-blue);
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: help;
+    background: var(--white);
+    color: var(--black-blue);
+    transition: background 0.15s ease;
+  }
+  .word-pill:hover { background: var(--light-green); }
+  .word-pill.primary  { background: var(--pastel-blue); }
+  .word-pill.primary:hover { background: var(--light-green); }
+  .word-pill.secondary { background: var(--white); }
 
   /* ----- RANDOM PICKER HERO ----- */
   .draw-hero {
